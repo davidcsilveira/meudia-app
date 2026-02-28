@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeuDia — Offline</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root { --accent: #ff6b2b; --border: #2a1a0e; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f5f0e8;
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+    .icon { font-size: 5rem; margin-bottom: 1.5rem; animation: float 3s ease-in-out infinite; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--border);
+      margin-bottom: 0.75rem;
+    }
+    p { color: #7a6555; font-size: 1rem; max-width: 320px; line-height: 1.6; margin-bottom: 2rem; }
+    .badge {
+      display: inline-block;
+      background: #fff9f0;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 0.8rem 1.5rem;
+      font-size: 0.85rem;
+      color: #7a6555;
+      margin-bottom: 2rem;
+    }
+    button {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 0.8rem 2rem;
+      background: var(--accent);
+      color: #fff;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 4px 4px 0 var(--border);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    button:hover { transform: translate(-2px,-2px); }
+    button:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--border); }
+  </style>
+</head>
+<body>
+  <div class="icon">📡</div>
+  <h1>Sem conexão</h1>
+  <p>Você está offline. Mas não se preocupe — seus dados estão salvos localmente e sincronizarão quando a conexão voltar.</p>
+  <div class="badge">✅ Seus dados estão seguros no dispositivo</div>
+  <button onclick="location.href='./index.html'">Tentar novamente</button>
+</body>
+</html>

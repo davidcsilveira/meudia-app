@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2a1a0e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MeuDia" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="description" content="Organize sua vida com atividades, finanças e lista de compras" />
+
+  <title>MeuDia</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===== SPLASH SCREEN ===== -->
+<div class="splash" id="splash">
+  <div class="splash-logo">
+    <div class="splash-icon">MD<span class="splash-dot">.</span></div>
+    <div class="splash-name">MeuDia</div>
+    <div class="splash-tagline">Organize sua vida</div>
+  </div>
+  <div class="splash-loader">
+    <div class="splash-bar"></div>
+  </div>
+</div>
+
+<!-- ===== INSTALL BANNER ===== -->
+<div class="install-banner" id="install-banner">
+  <div class="install-icon">📲</div>
+  <div class="install-text">
+    <strong>Instalar MeuDia</strong>
+    <span>Adicione à tela inicial</span>
+  </div>
+  <button class="install-btn" id="install-btn">Instalar</button>
+  <button class="install-close" onclick="dismissInstall()">✕</button>
+</div>
+
+<!-- ===== APP WRAPPER ===== -->
+<div class="app-wrapper" id="app" style="display:none">
+
+  <!-- TOP HEADER -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <div class="app-logo">MeuDia<span class="dot">.</span></div>
+      <div class="top-datetime" id="datetime"></div>
+    </div>
+    <div class="top-bar-right">
+      <button class="icon-pill" id="notif-btn" title="Notificações" onclick="requestNotifications()">🔔</button>
+    </div>
+  </header>
+
+  <!-- PAGE CONTENT -->
+  <main class="pages" id="pages">
+
+    <!-- ===== ATIVIDADES ===== -->
+    <section class="page active" id="page-atividades">
+      <div class="page-header">
+        <h1>Atividades</h1>
+        <p id="today-label"></p>
+      </div>
+
+      <!-- Progress ring -->
+      <div class="progress-ring-wrap">
+        <svg class="progress-ring" width="110" height="110" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="46" fill="none" stroke="#e8dfd0" stroke-width="8"/>
+          <circle cx="55" cy="55" r="46" fill="none" stroke="#ff6b2b" stroke-width="8"
+            stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="289"
+            transform="rotate(-90 55 55)" id="ring-circle" style="transition:stroke-dashoffset 0.6s ease"/>
+        </svg>
+        <div class="ring-center">
+          <span class="ring-pct" id="ring-pct">0%</span>
+          <span class="ring-label">feito</span>
+        </div>
+      </div>
+
+      <!-- Mini stats -->
+      <div class="mini-stats">
+        <div class="mini-stat"><span id="ms-total">0</span><small>Total</small></div>
+        <div class="mini-stat green"><span id="ms-done">0</span><small>Feitas</small></div>
+        <div class="mini-stat orange"><span id="ms-pending">0</span><small>Pendentes</small></div>
+      </div>
+
+      <!-- Quick add -->
+      <div class="quick-add-wrap">
+        <input type="text" id="task-name" class="quick-input" placeholder="Nova atividade..." />
+        <button class="quick-add-btn" onclick="addTask()">+</button>
+      </div>
+
+      <!-- Expandable form -->
+      <div class="expand-form" id="task-expand">
+        <div class="expand-toggle" onclick="toggleExpand('task-expand')">
+          <span>⚙️ Mais opções</span><span class="chevron">▾</span>
+        </div>
+        <div class="expand-content">
+          <div class="form-row">
+            <select id="task-category" class="input-sm">
+              <option value="pessoal">🏠 Pessoal</option>
+              <option value="trabalho">💼 Trabalho</option>
+              <option value="saude">🏃 Saúde</option>
+              <option value="estudo">📚 Estudo</option>
+              <option value="lazer">🎮 Lazer</option>
+            </select>
+            <select id="task-priority" class="input-sm">
+              <option value="baixa">🟢 Baixa</option>
+              <option value="media">🟡 Média</option>
+              <option value="alta">🔴 Alta</option>
+            </select>
+            <input type="time" id="task-time" class="input-sm" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="chip-row">
+        <button class="chip active" onclick="filterTasks(this,'all')">Todas</button>
+        <button class="chip" onclick="filterTasks(this,'pendente')">Pendentes</button>
+        <button class="chip" onclick="filterTasks(this,'concluida')">Concluídas</button>
+      </div>
+
+      <div class="list-wrap" id="task-list"></div>
+
+      <!-- Chart collapsible -->
+      <details class="chart-details">
+        <summary>📊 Ver gráfico por categoria</summary>
+        <div class="chart-inner">
+          <canvas id="taskChart"></canvas>
+        </div>
+      </details>
+    </section>
+
+    <!-- ===== FINANCEIRO ===== -->
+    <section class="page" id="page-financeiro">
+      <div class="page-header">
+        <h1>Financeiro</h1>
+        <p>Controle de receitas e despesas</p>
+      </div>
+
+      <!-- Saldo card -->
+      <div class="saldo-card" id="saldo-card">
+        <div class="saldo-label">Saldo Atual</div>
+        <div class="saldo-value" id="saldo-value">R$ 0,00</div>
+        <div class="saldo-sub">
+          <span class="saldo-green">↑ <span id="s-receita">0,00</span></span>
+          <span class="saldo-red">↓ <span id="s-despesa">0,00</span></span>
+        </div>
+      </div>
+
+      <!-- Quick add finance -->
+      <div class="fin-quick">
+        <input type="text" id="fin-desc" class="quick-input" placeholder="Descrição..." />
+        <input type="number" id="fin-valor" class="quick-input" placeholder="R$ Valor" step="0.01" style="max-width:110px" />
+        <div class="fin-type-toggle">
+          <button class="type-btn active" id="btn-receita" onclick="setFinType('receita')">+ Receita</button>
+          <button class="type-btn red" id="btn-despesa" onclick="setFinType('despesa')">- Despesa</button>
+        </div>
+      </div>
+
+      <div class="expand-form" id="fin-expand">
+        <div class="expand-toggle" onclick="toggleExpand('fin-expand')">
+          <span>⚙️ Mais opções</span><span class="chevron">▾</span>
+        </div>
+        <div class="expand-content">
+          <div class="form-row">
+            <select id="fin-categoria" class="input-sm">
+              <option value="alimentacao">🍕 Alimentação</option>
+              <option value="transporte">🚗 Transporte</option>
+              <option value="moradia">🏠 Moradia</option>
+              <option value="saude">💊 Saúde</option>
+              <option value="lazer">🎭 Lazer</option>
+              <option value="salario">💼 Salário</option>
+              <option value="outros">📦 Outros</option>
+            </select>
+            <input type="date" id="fin-data" class="input-sm" />
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-full" onclick="addFinanca()">✅ Adicionar Transação</button>
+
+      <div class="list-wrap" id="finance-list"></div>
+
+      <details class="chart-details">
+        <summary>📊 Ver gráfico de despesas</summary>
+        <div class="chart-inner">
+          <canvas id="financeChart"></canvas>
+        </div>
+      </details>
+    </section>
+
+    <!-- ===== COMPRAS ===== -->
+    <section class="page" id="page-compras">
+      <div class="page-header">
+        <h1>Compras</h1>
+        <p>Lista do supermercado</p>
+      </div>
+
+      <!-- Compras summary bar -->
+      <div class="compras-bar">
+        <div class="cb-item">
+          <span id="cb-total">0</span>
+          <small>itens</small>
+        </div>
+        <div class="cb-item green">
+          <span id="cb-marcados">0</span>
+          <small>no carrinho</small>
+        </div>
+        <div class="cb-item accent">
+          <span id="cb-valor">R$0</span>
+          <small>estimado</small>
+        </div>
+      </div>
+
+      <!-- Quick add compra -->
+      <div class="quick-add-wrap">
+        <input type="text" id="comp-nome" class="quick-input" placeholder="Produto..." />
+        <button class="quick-add-btn" onclick="addCompra()">+</button>
+      </div>
+
+      <div class="expand-form" id="comp-expand">
+        <div class="expand-toggle" onclick="toggleExpand('comp-expand')">
+          <span>⚙️ Mais opções</span><span class="chevron">▾</span>
+        </div>
+        <div class="expand-content">
+          <div class="form-row">
+            <input type="number" id="comp-qtd" class="input-sm" placeholder="Qtd" value="1" min="0.1" step="0.1" style="max-width:70px"/>
+            <select id="comp-unidade" class="input-sm" style="max-width:70px">
+              <option value="un">un</option><option value="kg">kg</option>
+              <option value="g">g</option><option value="L">L</option>
+              <option value="ml">ml</option><option value="cx">cx</option>
+            </select>
+            <select id="comp-categoria" class="input-sm">
+              <option value="hortifruti">🥦 Hortifruti</option>
+              <option value="carnes">🥩 Carnes</option>
+              <option value="laticinios">🧀 Laticínios</option>
+              <option value="padaria">🍞 Padaria</option>
+              <option value="bebidas">🥤 Bebidas</option>
+              <option value="limpeza">🧹 Limpeza</option>
+              <option value="higiene">🧴 Higiene</option>
+              <option value="mercearia">🛒 Mercearia</option>
+            </select>
+            <input type="number" id="comp-preco" class="input-sm" placeholder="R$ preço" step="0.01" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Category chips -->
+      <div class="chip-row" style="overflow-x:auto;padding-bottom:4px">
+        <button class="chip active" onclick="filterCompras(this,'all')">Todas</button>
+        <button class="chip" onclick="filterCompras(this,'hortifruti')">🥦</button>
+        <button class="chip" onclick="filterCompras(this,'carnes')">🥩</button>
+        <button class="chip" onclick="filterCompras(this,'laticinios')">🧀</button>
+        <button class="chip" onclick="filterCompras(this,'bebidas')">🥤</button>
+        <button class="chip" onclick="filterCompras(this,'limpeza')">🧹</button>
+        <button class="chip" onclick="filterCompras(this,'higiene')">🧴</button>
+        <button class="chip" onclick="filterCompras(this,'mercearia')">🛒</button>
+      </div>
+
+      <div class="list-wrap" id="compras-list"></div>
+
+      <div class="action-row">
+        <button class="btn-outline-danger" onclick="clearCompradas()">🗑️ Limpar comprados</button>
+        <button class="btn-outline" onclick="clearAllCompras()">🔄 Nova lista</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <nav class="bottom-nav">
+    <button class="bnav-btn active" data-page="atividades" onclick="goPage(this,'atividades')">
+      <span class="bnav-icon">📋</span>
+      <span class="bnav-label">Atividades</span>
+    </button>
+    <button class="bnav-btn" data-page="financeiro" onclick="goPage(this,'financeiro')">
+      <span class="bnav-icon">💰</span>
+      <span class="bnav-label">Financeiro</span>
+    </button>
+    <button class="bnav-btn" data-page="compras" onclick="goPage(this,'compras')">
+      <span class="bnav-icon">🛒</span>
+      <span class="bnav-label">Compras</span>
+    </button>
+  </nav>
+
+</div><!-- end app-wrapper -->
+
+<!-- ===== MODAL ===== -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <h3 id="modal-title">Editar</h3>
+    <div id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="document.getElementById('modal').classList.remove('open')">Cancelar</button>
+      <button class="btn-accent" id="modal-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
