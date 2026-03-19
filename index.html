@@ -285,6 +285,187 @@
       </div>
     </section>
 
+    <!-- ===== ACADEMIA ===== -->
+    <section class="page" id="page-academia">
+      <div class="page-header">
+        <h1>Academia</h1>
+        <p>Treinos, corpo e alimentação</p>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="switchAcadTab(this,'treinos')">🏋️ Treinos</button>
+        <button class="sub-tab" onclick="switchAcadTab(this,'corpo')">⚖️ Corpo</button>
+        <button class="sub-tab" onclick="switchAcadTab(this,'nutri')">🥗 Nutrição</button>
+      </div>
+
+      <!-- ===== TREINOS ===== -->
+      <div class="acad-tab active" id="acad-treinos">
+
+        <!-- Dias da semana -->
+        <div class="week-card">
+          <div class="week-title">📅 Dias de Treino — Semana Atual</div>
+          <div class="week-days" id="week-days"></div>
+        </div>
+
+        <!-- Criar série -->
+        <div class="card-acad">
+          <div class="card-acad-header" onclick="toggleExpand('serie-expand')">
+            <span>➕ Nova Série de Treino</span><span class="chevron">▾</span>
+          </div>
+          <div class="expand-content" id="serie-expand" style="padding:0.8rem 0 0">
+            <div class="form-col">
+              <input type="text" id="serie-nome" class="quick-input" placeholder="Nome da série (ex: Peito/Tríceps)" />
+              <select id="serie-tipo" class="input-sm">
+                <option value="A">Treino A</option>
+                <option value="B">Treino B</option>
+                <option value="C">Treino C</option>
+                <option value="D">Treino D</option>
+                <option value="full">Full Body</option>
+                <option value="cardio">Cardio</option>
+              </select>
+              <div class="form-row">
+                <select id="serie-dias" class="input-sm" multiple style="height:90px">
+                  <option value="seg">Segunda</option>
+                  <option value="ter">Terça</option>
+                  <option value="qua">Quarta</option>
+                  <option value="qui">Quinta</option>
+                  <option value="sex">Sexta</option>
+                  <option value="sab">Sábado</option>
+                  <option value="dom">Domingo</option>
+                </select>
+              </div>
+              <button class="btn-full" onclick="addSerie()">✅ Criar Série</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de séries -->
+        <div id="series-list"></div>
+
+      </div>
+
+      <!-- ===== CORPO ===== -->
+      <div class="acad-tab" id="acad-corpo">
+
+        <!-- Objetivo -->
+        <div class="card-acad">
+          <div class="objetivo-title">🎯 Meu Objetivo</div>
+          <div class="objetivo-btns" id="objetivo-btns">
+            <button class="obj-btn" data-obj="emagrecer" onclick="setObjetivo(this,'emagrecer')">🔥 Emagrecer</button>
+            <button class="obj-btn" data-obj="massa" onclick="setObjetivo(this,'massa')">💪 Ganhar Massa</button>
+            <button class="obj-btn" data-obj="definir" onclick="setObjetivo(this,'definir')">✂️ Definir</button>
+            <button class="obj-btn" data-obj="manter" onclick="setObjetivo(this,'manter')">⚖️ Manter</button>
+          </div>
+        </div>
+
+        <!-- Registro corporal -->
+        <div class="card-acad">
+          <div class="card-acad-header">📏 Registrar Medidas</div>
+          <div class="form-col" style="margin-top:0.7rem">
+            <div class="form-row">
+              <div class="input-group">
+                <label>Peso (kg)</label>
+                <input type="number" id="med-peso" class="input-sm" placeholder="ex: 75.5" step="0.1" />
+              </div>
+              <div class="input-group">
+                <label>% Gordura</label>
+                <input type="number" id="med-gordura" class="input-sm" placeholder="ex: 18.5" step="0.1" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="input-group">
+                <label>Cintura (cm)</label>
+                <input type="number" id="med-cintura" class="input-sm" placeholder="ex: 80" step="0.1" />
+              </div>
+              <div class="input-group">
+                <label>Braço (cm)</label>
+                <input type="number" id="med-braco" class="input-sm" placeholder="ex: 35" step="0.1" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="input-group">
+                <label>Peito (cm)</label>
+                <input type="number" id="med-peito" class="input-sm" placeholder="ex: 95" step="0.1" />
+              </div>
+              <div class="input-group">
+                <label>Perna (cm)</label>
+                <input type="number" id="med-perna" class="input-sm" placeholder="ex: 55" step="0.1" />
+              </div>
+            </div>
+            <select id="med-fase" class="input-sm">
+              <option value="inicial">📍 Medida Inicial</option>
+              <option value="progresso">📈 Em Progresso</option>
+              <option value="final">🏆 Resultado Final</option>
+            </select>
+            <input type="date" id="med-data" class="input-sm" />
+            <button class="btn-full" onclick="addMedida()">📏 Salvar Medidas</button>
+          </div>
+        </div>
+
+        <!-- Evolução -->
+        <div id="medidas-list"></div>
+
+        <!-- Gráfico evolução -->
+        <details class="chart-details">
+          <summary>📊 Gráfico de Evolução do Peso</summary>
+          <div class="chart-inner">
+            <canvas id="pesoChart"></canvas>
+          </div>
+        </details>
+
+      </div>
+
+      <!-- ===== NUTRIÇÃO ===== -->
+      <div class="acad-tab" id="acad-nutri">
+
+        <!-- Objetivo nutricional -->
+        <div class="nutri-goal-card" id="nutri-goal-card">
+          <div class="nutri-goal-title">Plano Alimentar</div>
+          <div class="nutri-goal-sub" id="nutri-obj-label">Defina seu objetivo na aba Corpo</div>
+        </div>
+
+        <!-- Plano alimentar por objetivo -->
+        <div id="plano-nutri"></div>
+
+        <!-- Refeições do dia -->
+        <div class="card-acad" style="margin-top:0.8rem">
+          <div class="card-acad-header">➕ Registrar Refeição</div>
+          <div class="form-col" style="margin-top:0.7rem">
+            <input type="text" id="ref-desc" class="quick-input" placeholder="O que você comeu?" />
+            <div class="form-row">
+              <select id="ref-tipo" class="input-sm">
+                <option value="cafe">☀️ Café da manhã</option>
+                <option value="lanche1">🍎 Lanche manhã</option>
+                <option value="almoco">🍽️ Almoço</option>
+                <option value="lanche2">🍌 Lanche tarde</option>
+                <option value="jantar">🌙 Jantar</option>
+                <option value="ceia">🌛 Ceia</option>
+                <option value="pretrein">⚡ Pré-treino</option>
+                <option value="postrein">💪 Pós-treino</option>
+              </select>
+              <input type="number" id="ref-kcal" class="input-sm" placeholder="Kcal" style="max-width:90px" />
+            </div>
+            <button class="btn-full" onclick="addRefeicao()">✅ Registrar</button>
+          </div>
+        </div>
+
+        <!-- Lista de refeições hoje -->
+        <div class="section-label">🍽️ Refeições de Hoje</div>
+        <div id="refeicoes-list"></div>
+
+        <!-- Kcal chart -->
+        <details class="chart-details">
+          <summary>📊 Calorias da Semana</summary>
+          <div class="chart-inner">
+            <canvas id="kcalChart"></canvas>
+          </div>
+        </details>
+
+      </div>
+
+    </section>
+
   </main>
 
   <!-- ===== BOTTOM NAV ===== -->
@@ -300,6 +481,10 @@
     <button class="bnav-btn" data-page="compras" onclick="goPage(this,'compras')">
       <span class="bnav-icon">🛒</span>
       <span class="bnav-label">Compras</span>
+    </button>
+    <button class="bnav-btn" data-page="academia" onclick="goPage(this,'academia')">
+      <span class="bnav-icon">🏋️</span>
+      <span class="bnav-label">Academia</span>
     </button>
   </nav>
 
@@ -317,6 +502,16 @@
     </div>
   </div>
 </div>
+
+<!-- ===== LIGHTBOX ===== -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close">✕</button>
+  <div id="lightbox-content"></div>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="file-foto" class="file-input-hidden" accept="image/*" capture="environment" />
+<input type="file" id="file-video" class="file-input-hidden" accept="video/*" capture="environment" />
 
 <!-- ===== TOAST ===== -->
 <div class="toast" id="toast"></div>

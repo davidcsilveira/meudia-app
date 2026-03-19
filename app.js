@@ -599,7 +599,18 @@ shakeStyle.textContent = `@keyframes shake {
 }`;
 document.head.appendChild(shakeStyle);
 
-// ===== INIT =====
+// ----- expand-content open toggle fix -----
+// expand-content inside serie-expand needs special handling
+document.addEventListener('click', e => {
+  const toggle = e.target.closest('.card-acad-header');
+  if (!toggle) return;
+  const body = toggle.nextElementSibling;
+  if (body && body.id && body.id.endsWith('-expand')) {
+    body.style.display = body.style.display === 'block' ? 'none' : 'block';
+    const ch = toggle.querySelector('.chevron');
+    if (ch) ch.style.transform = body.style.display==='block' ? 'rotate(180deg)' : '';
+  }
+});
 function init() {
   updateDateTime();
 
@@ -617,4 +628,599 @@ function init() {
   renderTasks();
   renderFinancas();
   renderCompras();
+  initAcademia();
+}
+
+// ===================================================
+// ===== ACADEMIA =====
+// ===================================================
+
+let series    = JSON.parse(localStorage.getItem('meudia_series'))    || [];
+let medidas   = JSON.parse(localStorage.getItem('meudia_medidas'))   || [];
+let refeicoes = JSON.parse(localStorage.getItem('meudia_refeicoes')) || [];
+let objetivo  = localStorage.getItem('meudia_objetivo') || null;
+let weekCheck = JSON.parse(localStorage.getItem('meudia_weekcheck')) || {};
+
+// Persist
+const saveAcad = () => {
+  localStorage.setItem('meudia_series',    JSON.stringify(series));
+  localStorage.setItem('meudia_medidas',   JSON.stringify(medidas));
+  localStorage.setItem('meudia_refeicoes', JSON.stringify(refeicoes));
+  localStorage.setItem('meudia_objetivo',  objetivo || '');
+  localStorage.setItem('meudia_weekcheck', JSON.stringify(weekCheck));
+};
+
+// ----- Sub-tabs -----
+function switchAcadTab(btn, tab) {
+  document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.acad-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('acad-' + tab).classList.add('active');
+  if (tab === 'corpo') renderMedidas();
+  if (tab === 'nutri') renderNutri();
+}
+
+// ----- Week days -----
+const DIAS = ['dom','seg','ter','qua','qui','sex','sab'];
+const DIAS_LABEL = ['D','S','T','Q','Q','S','S'];
+
+function getWeekKey() {
+  const d = new Date();
+  const start = new Date(d);
+  start.setDate(d.getDate() - d.getDay());
+  return start.toISOString().slice(0,10);
+}
+
+function renderWeekDays() {
+  const el = document.getElementById('week-days');
+  if (!el) return;
+  const wk = getWeekKey();
+  if (!weekCheck[wk]) weekCheck[wk] = {};
+  const today = new Date().getDay();
+
+  el.innerHTML = DIAS.map((d, i) => {
+    const state = weekCheck[wk][d] || 'none'; // none | treino | completo
+    const isToday = i === today;
+    let icon = '';
+    if (state === 'treino')   icon = '🏋️';
+    if (state === 'completo') icon = '✅';
+    return `
+      <div class="week-day">
+        <span class="week-day-label">${DIAS_LABEL[i]}</span>
+        <div class="week-day-box ${state !== 'none' ? state : ''} ${isToday ? 'hoje' : ''}"
+          onclick="cycleWeekDay('${d}')">${icon}</div>
+      </div>`;
+  }).join('');
+}
+
+function cycleWeekDay(dia) {
+  const wk = getWeekKey();
+  if (!weekCheck[wk]) weekCheck[wk] = {};
+  const cur = weekCheck[wk][dia] || 'none';
+  const next = cur === 'none' ? 'treino' : cur === 'treino' ? 'completo' : 'none';
+  weekCheck[wk][dia] = next;
+  saveAcad();
+  haptic('light');
+  renderWeekDays();
+  if (next === 'completo') showToast('🎉 Treino concluído!');
+}
+
+// ----- Series -----
+function addSerie() {
+  const nome = document.getElementById('serie-nome').value.trim();
+  if (!nome) { shakeEl('serie-nome'); return; }
+
+  const selectEl = document.getElementById('serie-dias');
+  const diasSel  = Array.from(selectEl.selectedOptions).map(o => o.value);
+
+  const s = {
+    id: Date.now(),
+    nome,
+    tipo: document.getElementById('serie-tipo').value,
+    dias: diasSel,
+    exercicios: []
+  };
+  series.push(s);
+  saveAcad();
+  document.getElementById('serie-nome').value = '';
+  haptic('success');
+  showToast('💪 Série criada!');
+  renderSeries();
+}
+
+function renderSeries() {
+  const el = document.getElementById('series-list');
+  if (!el) return;
+  if (!series.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🏋️</div><p>Nenhuma série criada ainda</p></div>`;
+    return;
+  }
+  el.innerHTML = series.map(s => serieHTML(s)).join('');
+}
+
+function serieHTML(s) {
+  const diasLabel = s.dias.length ? s.dias.join(', ') : 'sem dia fixo';
+  const exCount   = s.exercicios.length;
+  return `
+    <div class="serie-item" id="serie-${s.id}">
+      <div class="serie-header" onclick="toggleSerie(${s.id})">
+        <span class="serie-badge">${s.tipo}</span>
+        <div class="serie-info">
+          <div class="serie-nome">${escHtml(s.nome)}</div>
+          <div class="serie-meta">📅 ${diasLabel} · 🏋️ ${exCount} exercício${exCount!==1?'s':''}</div>
+        </div>
+        <div class="item-actions" onclick="event.stopPropagation()">
+          <button class="icon-btn" onclick="deleteSerie(${s.id})">🗑️</button>
+        </div>
+        <span class="serie-arrow">▾</span>
+      </div>
+      <div class="serie-body">
+        ${s.exercicios.map(ex => exerciseHTML(s.id, ex)).join('')}
+        ${addExerciseFormHTML(s.id)}
+      </div>
+    </div>`;
+}
+
+function toggleSerie(id) {
+  document.getElementById('serie-' + id)?.classList.toggle('open');
+}
+
+function deleteSerie(id) {
+  series = series.filter(s => s.id !== id);
+  saveAcad(); haptic('medium'); showToast('🗑️ Série removida'); renderSeries();
+}
+
+function addExerciseFormHTML(serieId) {
+  return `
+    <div class="add-exercise-form">
+      <div class="form-col">
+        <input type="text" id="ex-nome-${serieId}" class="quick-input" placeholder="Nome do exercício..." />
+        <div class="form-row">
+          <input type="number" id="ex-series-${serieId}" class="input-sm" placeholder="Séries" value="3" min="1" style="max-width:80px"/>
+          <input type="number" id="ex-reps-${serieId}"   class="input-sm" placeholder="Reps"   value="12" min="1" style="max-width:80px"/>
+          <input type="text"   id="ex-carga-${serieId}"  class="input-sm" placeholder="Carga (kg)" />
+        </div>
+        <input type="text" id="ex-obs-${serieId}" class="input-sm" placeholder="Observações..." />
+        <div class="media-preview-wrap" id="media-prev-${serieId}"></div>
+        <div class="form-row">
+          <label class="upload-btn" onclick="triggerUpload(${serieId},'foto')">📷 Foto</label>
+          <label class="upload-btn" onclick="triggerUpload(${serieId},'video')">🎥 Vídeo</label>
+        </div>
+        <button class="btn-full" onclick="addExercicio(${serieId})">➕ Adicionar Exercício</button>
+      </div>
+    </div>`;
+}
+
+// Media upload handling
+let pendingMediaSerieId = null;
+let pendingMediaType    = null;
+let pendingMediaData    = {};  // serieId -> {foto: base64, video: base64}
+
+function triggerUpload(serieId, type) {
+  pendingMediaSerieId = serieId;
+  pendingMediaType    = type;
+  document.getElementById(type === 'foto' ? 'file-foto' : 'file-video').click();
+}
+
+document.getElementById('file-foto')?.addEventListener('change', e => handleFileUpload(e, 'foto'));
+document.getElementById('file-video')?.addEventListener('change', e => handleFileUpload(e, 'video'));
+
+function handleFileUpload(e, type) {
+  const file = e.target.files[0];
+  if (!file || !pendingMediaSerieId) return;
+  const sid = pendingMediaSerieId;
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    if (!pendingMediaData[sid]) pendingMediaData[sid] = {};
+    pendingMediaData[sid][type] = ev.target.result;
+    updateMediaPreview(sid);
+    showToast(type === 'foto' ? '📷 Foto pronta!' : '🎥 Vídeo pronto!');
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function updateMediaPreview(serieId) {
+  const wrap = document.getElementById('media-prev-' + serieId);
+  if (!wrap) return;
+  const data = pendingMediaData[serieId] || {};
+  wrap.innerHTML = '';
+  if (data.foto) {
+    wrap.innerHTML += `<img class="media-thumb" src="${data.foto}" onclick="openLightbox('img','${data.foto}')" />`;
+  }
+  if (data.video) {
+    wrap.innerHTML += `<div class="media-thumb-video" onclick="openLightbox('video','${data.video}')">▶️</div>`;
+  }
+}
+
+function addExercicio(serieId) {
+  const nome = document.getElementById(`ex-nome-${serieId}`)?.value.trim();
+  if (!nome) { shakeEl(`ex-nome-${serieId}`); return; }
+
+  const serie = series.find(s => s.id === serieId);
+  if (!serie) return;
+
+  const ex = {
+    id: Date.now(),
+    nome,
+    series: parseInt(document.getElementById(`ex-series-${serieId}`)?.value) || 3,
+    reps:   parseInt(document.getElementById(`ex-reps-${serieId}`)?.value)   || 12,
+    carga:  document.getElementById(`ex-carga-${serieId}`)?.value || '',
+    obs:    document.getElementById(`ex-obs-${serieId}`)?.value   || '',
+    foto:   pendingMediaData[serieId]?.foto  || null,
+    video:  pendingMediaData[serieId]?.video || null,
+    setsDone: []
+  };
+
+  serie.exercicios.push(ex);
+  delete pendingMediaData[serieId];
+  saveAcad(); haptic('success'); showToast('✅ Exercício adicionado!');
+  renderSeries();
+  // Re-open the serie
+  setTimeout(() => {
+    document.getElementById('serie-' + serieId)?.classList.add('open');
+  }, 50);
+}
+
+function exerciseHTML(serieId, ex) {
+  const setsArr = Array.from({length: ex.series}, (_, i) => i);
+  return `
+    <div class="exercise-item">
+      <div class="exercise-media" onclick="${ex.foto ? `openLightbox('img','${ex.foto}')` : ex.video ? `openLightbox('video','${ex.video}')` : ''}">
+        ${ex.foto
+          ? `<img src="${ex.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:6px" />`
+          : ex.video ? '▶️' : '🏋️'}
+      </div>
+      <div class="exercise-info">
+        <div class="exercise-nome">${escHtml(ex.nome)}</div>
+        <div class="exercise-detail">${ex.series}x${ex.reps}${ex.carga ? ' · ' + ex.carga + 'kg' : ''}${ex.obs ? ' · ' + escHtml(ex.obs) : ''}</div>
+        <div class="exercise-sets">
+          ${setsArr.map(i => {
+            const done = (ex.setsDone||[]).includes(i);
+            return `<button class="set-pill ${done?'done':''}" onclick="toggleSet(${serieId},${ex.id},${i})">
+              ${done ? '✓' : ''} S${i+1}
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+      <button class="icon-btn" onclick="deleteExercicio(${serieId},${ex.id})">🗑️</button>
+    </div>`;
+}
+
+function toggleSet(serieId, exId, setIndex) {
+  const serie = series.find(s => s.id === serieId);
+  const ex    = serie?.exercicios.find(e => e.id === exId);
+  if (!ex) return;
+  if (!ex.setsDone) ex.setsDone = [];
+  const idx = ex.setsDone.indexOf(setIndex);
+  if (idx >= 0) ex.setsDone.splice(idx, 1);
+  else           ex.setsDone.push(setIndex);
+  saveAcad(); haptic('light'); renderSeries();
+  setTimeout(() => document.getElementById('serie-' + serieId)?.classList.add('open'), 50);
+}
+
+function deleteExercicio(serieId, exId) {
+  const serie = series.find(s => s.id === serieId);
+  if (!serie) return;
+  serie.exercicios = serie.exercicios.filter(e => e.id !== exId);
+  saveAcad(); haptic('medium'); showToast('🗑️ Exercício removido'); renderSeries();
+  setTimeout(() => document.getElementById('serie-' + serieId)?.classList.add('open'), 50);
+}
+
+// ----- Objetivo -----
+function setObjetivo(btn, obj) {
+  objetivo = obj;
+  saveAcad();
+  document.querySelectorAll('.obj-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  haptic('success');
+  showToast('🎯 Objetivo definido!');
+  renderNutri();
+}
+
+function renderObjetivo() {
+  if (!objetivo) return;
+  document.querySelector(`[data-obj="${objetivo}"]`)?.classList.add('active');
+}
+
+// ----- Medidas -----
+function addMedida() {
+  const peso = parseFloat(document.getElementById('med-peso').value);
+  if (!peso) { shakeEl('med-peso'); return; }
+  const med = {
+    id: Date.now(),
+    peso,
+    gordura: parseFloat(document.getElementById('med-gordura').value) || null,
+    cintura: parseFloat(document.getElementById('med-cintura').value) || null,
+    braco:   parseFloat(document.getElementById('med-braco').value)   || null,
+    peito:   parseFloat(document.getElementById('med-peito').value)   || null,
+    perna:   parseFloat(document.getElementById('med-perna').value)   || null,
+    fase:    document.getElementById('med-fase').value,
+    data:    document.getElementById('med-data').value || new Date().toISOString().slice(0,10)
+  };
+  medidas.unshift(med);
+  saveAcad(); haptic('success'); showToast('📏 Medida registrada!');
+  ['med-peso','med-gordura','med-cintura','med-braco','med-peito','med-perna'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderMedidas();
+}
+
+function renderMedidas() {
+  const el = document.getElementById('medidas-list');
+  if (!el) return;
+  if (!medidas.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">⚖️</div><p>Nenhuma medida registrada</p></div>`;
+    return;
+  }
+  const faseName = { inicial:'📍 Inicial', progresso:'📈 Progresso', final:'🏆 Final' };
+  el.innerHTML = medidas.map(m => {
+    const dataFmt = m.data ? new Date(m.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'2-digit'}) : '';
+    return `
+      <div class="medida-item">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
+          <span class="medida-fase-badge fase-${m.fase}">${faseName[m.fase]||m.fase}</span>
+          <div style="display:flex;gap:0.4rem;align-items:center">
+            <span style="font-size:0.7rem;color:var(--text-muted)">${dataFmt}</span>
+            <button class="icon-btn" onclick="deleteMedida(${m.id})">🗑️</button>
+          </div>
+        </div>
+        <div class="medida-grid">
+          <div class="medida-cell"><span class="val">${m.peso}kg</span><span class="lbl">Peso</span></div>
+          ${m.gordura ? `<div class="medida-cell"><span class="val">${m.gordura}%</span><span class="lbl">Gordura</span></div>` : ''}
+          ${m.cintura ? `<div class="medida-cell"><span class="val">${m.cintura}cm</span><span class="lbl">Cintura</span></div>` : ''}
+          ${m.braco   ? `<div class="medida-cell"><span class="val">${m.braco}cm</span><span class="lbl">Braço</span></div>` : ''}
+          ${m.peito   ? `<div class="medida-cell"><span class="val">${m.peito}cm</span><span class="lbl">Peito</span></div>` : ''}
+          ${m.perna   ? `<div class="medida-cell"><span class="val">${m.perna}cm</span><span class="lbl">Perna</span></div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+  renderPesoChart();
+}
+
+function deleteMedida(id) {
+  medidas = medidas.filter(m => m.id !== id);
+  saveAcad(); haptic('medium'); showToast('🗑️ Removida'); renderMedidas();
+}
+
+let pesoChartInst = null;
+function renderPesoChart() {
+  const ctx = document.getElementById('pesoChart');
+  if (!ctx || medidas.length < 2) return;
+  const sorted = [...medidas].sort((a,b) => a.data.localeCompare(b.data));
+  const labels = sorted.map(m => new Date(m.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}));
+  const pesos  = sorted.map(m => m.peso);
+  if (pesoChartInst) pesoChartInst.destroy();
+  pesoChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Peso (kg)',
+        data: pesos,
+        borderColor: '#ff6b2b',
+        backgroundColor: 'rgba(255,107,43,0.1)',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#ff6b2b',
+        pointBorderColor: '#2a1a0e',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { grid: { color: '#e8dfd0' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ----- Nutrição -----
+const PLANOS = {
+  emagrecer: {
+    titulo: '🔥 Plano para Emagrecer',
+    kcal: '1400–1800 kcal/dia · Déficit calórico',
+    refeicoes: [
+      { hora:'07:00', nome:'Café da manhã', kcal:300, alimentos:'Omelete de claras + pão integral + café sem açúcar' },
+      { hora:'10:00', nome:'Lanche manhã',  kcal:150, alimentos:'Fruta (maçã ou pera) + chá verde' },
+      { hora:'12:30', nome:'Almoço',        kcal:500, alimentos:'Frango grelhado + arroz integral + salada + legumes' },
+      { hora:'16:00', nome:'Lanche tarde',  kcal:200, alimentos:'Iogurte grego sem açúcar + granola light' },
+      { hora:'19:30', nome:'Jantar',        kcal:400, alimentos:'Peixe grelhado + batata-doce + salada verde' },
+      { hora:'22:00', nome:'Ceia',          kcal:100, alimentos:'Caseína ou iogurte + castanhas' }
+    ],
+    dicas: ['Beba 2–3L de água/dia', 'Reduza carboidratos simples', 'Priorize proteínas magras', 'Evite frituras e ultraprocessados']
+  },
+  massa: {
+    titulo: '💪 Plano para Ganhar Massa',
+    kcal: '2800–3500 kcal/dia · Superávit calórico',
+    refeicoes: [
+      { hora:'07:00', nome:'Café da manhã', kcal:600, alimentos:'Ovos mexidos (4) + aveia com mel + pão integral + suco' },
+      { hora:'10:00', nome:'Lanche manhã',  kcal:400, alimentos:'Vitamina: banana + pasta de amendoim + whey + leite' },
+      { hora:'12:30', nome:'Almoço',        kcal:800, alimentos:'Frango ou carne + arroz + feijão + legumes + suco' },
+      { hora:'15:30', nome:'Pré-treino',    kcal:350, alimentos:'Batata-doce + frango ou banana + whey' },
+      { hora:'19:00', nome:'Pós-treino',    kcal:400, alimentos:'Whey protein + banana + arroz branco' },
+      { hora:'20:30', nome:'Jantar',        kcal:700, alimentos:'Carne vermelha magra + macarrão integral + legumes' },
+      { hora:'23:00', nome:'Ceia',          kcal:300, alimentos:'Caseína + amendoim ou queijo cottage' }
+    ],
+    dicas: ['Coma de 3 em 3 horas', 'Priorize proteínas (2g/kg peso)', 'Carboidratos complexos pós-treino', 'Durma 7–9h para recuperação']
+  },
+  definir: {
+    titulo: '✂️ Plano para Definição',
+    kcal: '2000–2400 kcal/dia · Recomposição corporal',
+    refeicoes: [
+      { hora:'07:00', nome:'Café da manhã', kcal:400, alimentos:'Ovos + aveia + fruta vermelha + café' },
+      { hora:'10:00', nome:'Lanche manhã',  kcal:200, alimentos:'Iogurte grego + frutas vermelhas' },
+      { hora:'12:30', nome:'Almoço',        kcal:600, alimentos:'Frango ou peixe + arroz integral + salada + azeite' },
+      { hora:'15:30', nome:'Pré-treino',    kcal:250, alimentos:'Banana + whey ou claras de ovo' },
+      { hora:'19:00', nome:'Pós-treino',    kcal:300, alimentos:'Whey protein + arroz branco' },
+      { hora:'20:30', nome:'Jantar',        kcal:500, alimentos:'Salmão ou frango + vegetais + batata-doce' },
+      { hora:'23:00', nome:'Ceia',          kcal:150, alimentos:'Caseína ou queijo cottage' }
+    ],
+    dicas: ['Ciclagem de carboidratos nos dias de treino', 'Proteína alta (~2,2g/kg)', 'Aeróbico em jejum pode ajudar', 'Hidratação é fundamental']
+  },
+  manter: {
+    titulo: '⚖️ Plano para Manutenção',
+    kcal: '2200–2600 kcal/dia · Balanço energético',
+    refeicoes: [
+      { hora:'07:00', nome:'Café da manhã', kcal:450, alimentos:'Pão integral + ovos + fruta + café' },
+      { hora:'10:00', nome:'Lanche manhã',  kcal:200, alimentos:'Castanhas + fruta' },
+      { hora:'12:30', nome:'Almoço',        kcal:700, alimentos:'Proteína + arroz + feijão + salada variada' },
+      { hora:'16:00', nome:'Lanche tarde',  kcal:250, alimentos:'Iogurte + granola' },
+      { hora:'20:00', nome:'Jantar',        kcal:600, alimentos:'Proteína + legumes + carboidrato moderado' },
+      { hora:'22:30', nome:'Ceia',          kcal:200, alimentos:'Iogurte ou caseína' }
+    ],
+    dicas: ['Mantenha consistência nas refeições', 'Varie as fontes de proteína', 'Equilibre macro e micronutrientes', 'Ouça seu corpo e ajuste conforme necessário']
+  }
+};
+
+function renderNutri() {
+  const el = document.getElementById('plano-nutri');
+  const lbl = document.getElementById('nutri-obj-label');
+  const card = document.getElementById('nutri-goal-card');
+  if (!el) return;
+
+  if (!objetivo || !PLANOS[objetivo]) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🎯</div><p>Defina seu objetivo na aba <strong>Corpo</strong> para ver o plano alimentar</p></div>`;
+    if (lbl) lbl.textContent = 'Defina seu objetivo na aba Corpo';
+    return;
+  }
+
+  const plano = PLANOS[objetivo];
+  if (lbl) lbl.textContent = plano.kcal;
+
+  el.innerHTML = `
+    <div class="plano-card">
+      <div class="plano-header">${plano.titulo}</div>
+      ${plano.refeicoes.map(r => `
+        <div class="plano-refeicao">
+          <span class="plano-ref-hora">${r.hora}</span>
+          <div class="plano-ref-info">
+            <div class="plano-ref-nome">${r.nome}</div>
+            <div class="plano-ref-alimentos">${r.alimentos}</div>
+          </div>
+          <span class="plano-ref-kcal">${r.kcal}kcal</span>
+        </div>`).join('')}
+    </div>
+    <div class="card-acad">
+      <div class="card-acad-header">💡 Dicas para seu objetivo</div>
+      <div style="margin-top:0.6rem">
+        ${plano.dicas.map(d => `<div style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.3rem 0;font-size:0.85rem"><span>✅</span><span>${d}</span></div>`).join('')}
+      </div>
+    </div>`;
+
+  renderRefeicoes();
+}
+
+// ----- Refeições -----
+function addRefeicao() {
+  const desc = document.getElementById('ref-desc').value.trim();
+  if (!desc) { shakeEl('ref-desc'); return; }
+  const ref = {
+    id: Date.now(),
+    desc,
+    tipo:  document.getElementById('ref-tipo').value,
+    kcal:  parseInt(document.getElementById('ref-kcal').value) || 0,
+    data:  new Date().toISOString().slice(0,10)
+  };
+  refeicoes.unshift(ref);
+  saveAcad();
+  document.getElementById('ref-desc').value = '';
+  document.getElementById('ref-kcal').value = '';
+  haptic('success'); showToast('🍽️ Refeição registrada!');
+  renderRefeicoes();
+}
+
+const TIPO_ICONS = { cafe:'☀️', lanche1:'🍎', almoco:'🍽️', lanche2:'🍌', jantar:'🌙', ceia:'🌛', pretrein:'⚡', postrein:'💪' };
+const TIPO_NAMES = { cafe:'Café da manhã', lanche1:'Lanche manhã', almoco:'Almoço', lanche2:'Lanche tarde', jantar:'Jantar', ceia:'Ceia', pretrein:'Pré-treino', postrein:'Pós-treino' };
+
+function renderRefeicoes() {
+  const el = document.getElementById('refeicoes-list');
+  if (!el) return;
+  const hoje = new Date().toISOString().slice(0,10);
+  const hoje_refs = refeicoes.filter(r => r.data === hoje);
+
+  if (!hoje_refs.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🍽️</div><p>Nenhuma refeição registrada hoje</p></div>`;
+  } else {
+    const totalKcal = hoje_refs.reduce((s,r) => s + (r.kcal||0), 0);
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0 0.6rem;font-size:0.82rem;color:var(--text-muted)">
+        <span>${hoje_refs.length} refeições hoje</span>
+        <span style="font-family:var(--font-head);font-weight:800;color:var(--accent)">${totalKcal} kcal</span>
+      </div>
+      ${hoje_refs.map(r => `
+        <div class="refeicao-item">
+          <div class="ref-tipo-badge">${TIPO_ICONS[r.tipo]||'🍽️'}</div>
+          <div class="ref-info">
+            <div class="ref-desc">${escHtml(r.desc)}</div>
+            <div class="ref-meta">${TIPO_NAMES[r.tipo]||r.tipo}</div>
+          </div>
+          ${r.kcal ? `<div class="ref-kcal">${r.kcal}kcal</div>` : ''}
+          <button class="icon-btn" onclick="deleteRefeicao(${r.id})">🗑️</button>
+        </div>`).join('')}`;
+  }
+  renderKcalChart();
+}
+
+function deleteRefeicao(id) {
+  refeicoes = refeicoes.filter(r => r.id !== id);
+  saveAcad(); haptic('medium'); showToast('🗑️ Removida'); renderRefeicoes();
+}
+
+let kcalChartInst = null;
+function renderKcalChart() {
+  const ctx = document.getElementById('kcalChart');
+  if (!ctx) return;
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0,10));
+  }
+  const labels = days.map(d => new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}));
+  const vals   = days.map(d => refeicoes.filter(r=>r.data===d).reduce((s,r)=>s+(r.kcal||0),0));
+  if (kcalChartInst) kcalChartInst.destroy();
+  kcalChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label:'Kcal', data:vals, backgroundColor:'#ff6b2b99', borderColor:'#ff6b2b', borderWidth:2, borderRadius:6 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#e8dfd0' } }, x: { grid: { display: false } } }
+    }
+  });
+}
+
+// ----- Lightbox -----
+function openLightbox(type, src) {
+  const lb = document.getElementById('lightbox');
+  const ct = document.getElementById('lightbox-content');
+  if (!lb || !ct || !src) return;
+  ct.innerHTML = type === 'img'
+    ? `<img src="${src}" style="max-width:100%;max-height:80vh;border-radius:12px" />`
+    : `<video src="${src}" controls style="max-width:100%;max-height:80vh;border-radius:12px"></video>`;
+  lb.classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox')?.classList.remove('open');
+}
+
+// ----- Academia init -----
+function initAcademia() {
+  // Set date fields
+  const md = document.getElementById('med-data');
+  if (md) md.value = new Date().toISOString().slice(0,10);
+
+  renderWeekDays();
+  renderSeries();
+  renderObjetivo();
 }
